@@ -1,0 +1,12 @@
+{
+    "configurations": [
+        {
+            "name": "Python: test_imgs.py",
+            "type": "python",
+            "request": "launch",
+            "program": "test_imgs.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}
