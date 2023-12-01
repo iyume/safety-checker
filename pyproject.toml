@@ -9,7 +9,7 @@ license = { text = "Apache-2.0" }
 dependencies = ["Pillow>=8.4.0"]
 
 [project.optional-dependencies]
-sdmock = ["transformers>=4.0", "diffusers[torch]>=0.20"]
+sdhook = ["transformers>=4.0", "diffusers[torch]>=0.20"]
 
 
 [tool.pyright]

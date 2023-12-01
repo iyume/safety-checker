@@ -11,7 +11,7 @@ try:
     import torch
     import transformers
 except ImportError as e:
-    raise ImportError('please install by "pip install safety-checker[sdmock]"') from e
+    raise ImportError('please install by "pip install safety-checker[sdhook]"') from e
 
 from contextlib import contextmanager
 from typing import List, Union, cast
