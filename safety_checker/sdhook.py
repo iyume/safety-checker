@@ -14,7 +14,7 @@ except ImportError as e:
     raise ImportError('please install by "pip install safety-checker[sdhook]"') from e
 
 from contextlib import contextmanager
-from typing import List, Union, cast
+from typing import Any, List, Optional, Union, cast
 
 import diffusers
 import torch
@@ -24,6 +24,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from PIL import Image
 from transformers import CLIPImageProcessor
+from typing_extensions import Self
 
 # Silence warning message: Potential NSFW content was detected in one or more images. A black image will be returned instead. Try again with a different prompt and/or seed.
 diffusers.utils.logging.set_verbosity_error()
@@ -44,43 +45,64 @@ def _suppress_transformer_warning():
     transformers.logging.set_verbosity(_origin_level)
 
 
-# Downloads config.json and model.fp16.safetensors
-with _suppress_transformer_warning():
-    safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-        "runwayml/stable-diffusion-v1-5",
-        subfolder="safety_checker",
-        use_safetensors=True,
-        variant="fp16",
-    )
-safety_checker = cast(StableDiffusionSafetyChecker, safety_checker)
+class SafetyChecker:
+    feature_extractor: Optional[CLIPImageProcessor]
+    safety_checker: Optional[StableDiffusionSafetyChecker]
 
+    def __init__(
+        self,
+        feature_extractor: Optional[CLIPImageProcessor] = None,
+        safety_checker: Optional[StableDiffusionSafetyChecker] = None,
+    ) -> None:
+        self.feature_extractor = feature_extractor
+        self.safety_checker = safety_checker
 
-# Loads https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/feature_extractor/preprocessor_config.json
-# Feature extractor is just an image preprocessor that doesn't require weight
-feature_extractor = CLIPImageProcessor.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    subfolder="feature_extractor",
-)
-feature_extractor = cast(CLIPImageProcessor, feature_extractor)
+    @classmethod
+    def from_pretrained_default(cls) -> Self:
+        # Downloads config.json and model.fp16.safetensors
+        with _suppress_transformer_warning():
+            safety_checker = StableDiffusionSafetyChecker.from_pretrained(
+                "runwayml/stable-diffusion-v1-5",
+                subfolder="safety_checker",
+                use_safetensors=True,
+                variant="fp16",
+            )
+        safety_checker = cast(StableDiffusionSafetyChecker, safety_checker)
+        # Loads https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/feature_extractor/preprocessor_config.json
+        # Feature extractor is just an image preprocessor that doesn't require weight
+        feature_extractor = CLIPImageProcessor.from_pretrained(
+            "runwayml/stable-diffusion-v1-5",
+            subfolder="feature_extractor",
+        )
+        feature_extractor = cast(CLIPImageProcessor, feature_extractor)
+        return cls(feature_extractor, safety_checker)
 
+    @property
+    def device(self) -> torch.device:
+        if not self.safety_checker:
+            raise ValueError("no model loaded")
+        return self.safety_checker.device
 
-def run_safety_checker(
-    image: Union[Image.Image, List[Image.Image]],
-    device: Union[torch.device, str, int] = torch.device("cpu"),
-) -> bool:
-    """Run safety checker."""
-    if not isinstance(device, torch.device):
+    def to(self, device: Union[torch.device, str, int]) -> None:
         device = torch.device(device)
-    safety_checker.to(device)  # type: ignore  # diffusers shit types
-    # This pipeline is designed for SD batch generation
-    if not isinstance(image, list):
-        image = [image]
-    # No need to do input image normalization
-    safety_checker_input = feature_extractor(image, return_tensors="pt")
-    # Safety checker doesn't process image in its source code, so just put in
-    has_nsfw: list[bool]
-    _, has_nsfw = safety_checker(
-        images=safety_checker_input.pixel_values,  # dummy input
-        clip_input=safety_checker_input.pixel_values.to(device),
-    )
-    return any(has_nsfw)
+        if not self.safety_checker:
+            return
+        self.safety_checker = self.safety_checker.to(
+            cast(Any, device),  # type shit from diffusers
+        )
+
+    def run(self, image: Union[Image.Image, List[Image.Image]]) -> bool:
+        """Run safety checker. Returns True if any input images have nsfw content."""
+        if not self.feature_extractor or not self.safety_checker:
+            raise ValueError
+        # The original impl is designed for SD batch generation
+        if not isinstance(image, list):
+            image = [image]
+        # No need to do input image normalization
+        safety_checker_input = self.feature_extractor(image, return_tensors="pt")
+        has_nsfw: list[bool]
+        _, has_nsfw = self.safety_checker(
+            images=safety_checker_input.pixel_values,  # dummy input
+            clip_input=safety_checker_input.pixel_values.to(self.device),
+        )
+        return any(has_nsfw)
