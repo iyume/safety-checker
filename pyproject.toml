@@ -1,6 +1,6 @@
 [project]
 name = "safety-checker"
-version = "0.1.0"
+version = "0.2"
 description = "Integrate stable diffusion safety checker / NSFW image detection into web service like FastAPI."
 authors = [{ name = "iyume", email = "iyumelive@gmail.com" }]
 requires-python = ">=3.8"
