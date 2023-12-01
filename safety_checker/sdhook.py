@@ -83,13 +83,14 @@ class SafetyChecker:
             raise ValueError("no model loaded")
         return self.safety_checker.device
 
-    def to(self, device: Union[torch.device, str, int]) -> None:
+    def to(self, device: Union[torch.device, str, int]) -> Self:
         device = torch.device(device)
         if not self.safety_checker:
-            return
+            return self
         self.safety_checker = self.safety_checker.to(
             cast(Any, device),  # type shit from diffusers
         )
+        return self
 
     def run(self, image: Union[Image.Image, List[Image.Image]]) -> bool:
         """Run safety checker. Returns True if any input images have nsfw content."""
