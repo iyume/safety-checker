@@ -24,6 +24,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from PIL import Image
 from transformers import CLIPImageProcessor
+from transformers.image_utils import ImageInput
 from typing_extensions import Self
 
 # Silence warning message: Potential NSFW content was detected in one or more images. A black image will be returned instead. Try again with a different prompt and/or seed.
@@ -92,13 +93,10 @@ class SafetyChecker:
         )
         return self
 
-    def run(self, image: Union[Image.Image, List[Image.Image]]) -> bool:
+    def run(self, image: ImageInput) -> bool:
         """Run safety checker. Returns True if any input images have nsfw content."""
         if not self.feature_extractor or not self.safety_checker:
             raise ValueError
-        # The original impl is designed for SD batch generation
-        if not isinstance(image, list):
-            image = [image]
         # No need to do input image normalization
         safety_checker_input = self.feature_extractor(image, return_tensors="pt")
         has_nsfw: list[bool]
