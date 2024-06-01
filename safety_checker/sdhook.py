@@ -95,6 +95,10 @@ class SafetyChecker:
 
     def run(self, image: ImageInput) -> bool:
         """Run safety checker. Returns True if any input images have nsfw content."""
+        has_nsfw = self.run_batch(image)
+        return any(has_nsfw)
+
+    def run_batch(self, image: ImageInput) -> list[bool]:
         if not self.feature_extractor or not self.safety_checker:
             raise ValueError
         # No need to do input image normalization
@@ -104,4 +108,4 @@ class SafetyChecker:
             images=safety_checker_input.pixel_values,  # dummy input
             clip_input=safety_checker_input.pixel_values.to(self.device),
         )
-        return any(has_nsfw)
+        return has_nsfw
